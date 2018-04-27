@@ -25,6 +25,7 @@ func init() {
 	http.HandleFunc("/user/dodeletemonth", lib.DoDeleteFromSetting)
 	http.HandleFunc("/user/doupdate", lib.DoUpdate)
 	http.HandleFunc("/user/dodelete", lib.DoDelete)
+	http.HandleFunc("/user/dosync", lib.DoSynchronize)
 	http.HandleFunc("/dologout", lib.DoLogout)
 	http.Handle("/css", http.FileServer(http.Dir(".")))
 }
