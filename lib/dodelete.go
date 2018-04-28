@@ -10,6 +10,7 @@ import (
 )
 
 // 削除処理を行う関数
+// 削除は論理削除(isDeletedをtrueにする)
 func DoDelete(w http.ResponseWriter, r *http.Request) {
 	var err error
 	//===
@@ -43,7 +44,7 @@ func DoDelete(w http.ResponseWriter, r *http.Request) {
 	//===
 	//=== 削除処理
 	//===
-	err = Delete(r, idToDelete, yearBefore, monthBefore)
+	err = LogicalDelete(r, idToDelete, yearBefore, monthBefore)
 	//===
 	//=== ページ遷移
 	//===

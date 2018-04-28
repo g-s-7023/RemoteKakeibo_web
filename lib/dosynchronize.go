@@ -2,11 +2,9 @@ package lib
 
 import "net/http"
 
-// deleteの仕様変更
-// insertの場合、idを-1にする
-
 func DoSynchronize(w http.ResponseWriter, r *http.Request) {
 	// jsonのパース
+
 
 	// パースした情報(cliEnrty)を元に、挿入、更新用のデータ(配列)を作成
 	// cliEntryを挿入：cliEntryとidが一致するsrvEntryがない場合

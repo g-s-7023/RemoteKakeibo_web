@@ -29,6 +29,10 @@ const (
 	// 家計簿の各エントリが入るカインド(親キー：KakeiboMonthカインドのキー)
 	KAKEIBO_ENTRY = "KakeiboEntry"
 	//===
+	//=== IDなしの値(ID=クライアントのDB内でのIDなので、web上でinsertするときはNO_IDとなる)
+	//===
+	NO_ID = -1
+	//===
 	//=== typeの値
 	//===
 	INCOME  = 0
@@ -194,8 +198,7 @@ var (
 	//===
 	//=== 家計簿IDカインドのキー
 	//===
-	myKakeibo     = "myKakeibo"
-	familyKakeibo = "familyKakeibo"
+	KakeiboId = "familyKakeibo"
 	//===
 	//=== タイムゾーン
 	//===

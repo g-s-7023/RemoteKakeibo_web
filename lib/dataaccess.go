@@ -24,6 +24,7 @@ func InsertKakeibo(r *http.Request, p []ParamToInsert) error {
 		// 曜日の算出
 		dayOfWeek := time.Date(p[i].Year, time.Month(p[i].Month), p[i].Day, 0, 0, 0, 0, jst).Weekday()
 		entryToInsert[i] = Kakeibo{
+			Id:             NO_ID,
 			Day:            p[i].Day,
 			Month:          p[i].Month,
 			Year:           p[i].Year,
@@ -33,6 +34,8 @@ func InsertKakeibo(r *http.Request, p []ParamToInsert) error {
 			Price:          p[i].Price,
 			Detail:         p[i].Detail,
 			TermsOfPayment: CASH,
+			IsDeleted:      FALSE,
+			IsSynchronized: FALSE,
 		}
 	}
 	//===
@@ -44,7 +47,7 @@ func InsertKakeibo(r *http.Request, p []ParamToInsert) error {
 	keys := make([]*datastore.Key, putNum)
 	for i := 0; i < putNum; i++ {
 		keys[i] = datastore.NewIncompleteKey(ctx, KAKEIBO_ENTRY,
-			getMonthKey(ctx, familyKakeibo, entryToInsert[i].Year, entryToInsert[i].Month))
+			getMonthKey(ctx, KakeiboId, entryToInsert[i].Year, entryToInsert[i].Month))
 	}
 	// トランザクションで更新
 	err = datastore.RunInTransaction(ctx, func(c context.Context) error {
@@ -69,7 +72,7 @@ func ReadList(r *http.Request, year, month int) (*ParamToShowList, error) {
 	// queryの作成
 	// 指定した家計簿中の年・月で指定したエントリを全て表示
 	query := datastore.NewQuery(KAKEIBO_ENTRY).
-		Ancestor(getMonthKey(ctx, familyKakeibo, year, month)).
+		Ancestor(getMonthKey(ctx, KakeiboId, year, month)).
 		Order("-Day")
 	// queryの結果格納用のsliceの作成
 	var tempArray []Kakeibo
@@ -171,7 +174,7 @@ func ReadSummary(r *http.Request, year int) (*ParamToShowSummary, error) {
 	// queryの作成
 	// 指定した家計簿中の年・月で指定したエントリを全て表示
 	query := datastore.NewQuery(KAKEIBO_ENTRY).
-		Ancestor(getKakeiboKey(ctx, familyKakeibo)).
+		Ancestor(getKakeiboKey(ctx, KakeiboId)).
 		Filter("Year =", p.Year)
 	// queryの結果格納用のsliceの作成
 	var tempArray []Kakeibo
@@ -219,7 +222,7 @@ func Update(r *http.Request, p *ParamToUpdate) error {
 	var entryToUpdate Kakeibo
 	// 更新対象のエンティティのキーの取得
 	keyForUpdate := datastore.NewKey(ctx, KAKEIBO_ENTRY, "", int64(p.ID),
-		getMonthKey(ctx, familyKakeibo, p.YearBefore, p.MonthBefore))
+		getMonthKey(ctx, KakeiboId, p.YearBefore, p.MonthBefore))
 	// 更新対象のエンティティの取得
 	if err = datastore.Get(ctx, keyForUpdate, &entryToUpdate); err != nil {
 		return err
@@ -234,6 +237,7 @@ func Update(r *http.Request, p *ParamToUpdate) error {
 	entryToUpdate.Category = p.Category
 	entryToUpdate.Detail = p.Detail
 	entryToUpdate.Price = p.Price
+	entryToUpdate.IsSynchronized = FALSE
 
 	//===
 	//=== DB更新
@@ -254,7 +258,7 @@ func Update(r *http.Request, p *ParamToUpdate) error {
 			if e != nil {
 				return e
 			}
-			newKey := datastore.NewIncompleteKey(ctx, KAKEIBO_ENTRY, getMonthKey(ctx, familyKakeibo, p.Year, p.Month))
+			newKey := datastore.NewIncompleteKey(ctx, KAKEIBO_ENTRY, getMonthKey(ctx, KakeiboId, p.Year, p.Month))
 			_, e = datastore.Put(ctx, newKey, &entryToUpdate)
 			return e
 		}, nil)
@@ -262,18 +266,27 @@ func Update(r *http.Request, p *ParamToUpdate) error {
 	return err
 }
 
-// DBからデータ削除を行う関数
-func Delete(r *http.Request, id, year, month int) error {
+// DBから論理削除を行う関数
+func LogicalDelete(r *http.Request, id, year, month int) error {
 	var err error
 	//===
-	//=== エントリの削除
+	//=== エントリの論理削除
 	//===
 	// Contextの作成
 	ctx := appengine.NewContext(r)
 	// 削除対象のエンティティのキーの取得
-	keyForDelete := datastore.NewKey(ctx, KAKEIBO_ENTRY, "", int64(id), getMonthKey(ctx, familyKakeibo, year, month))
+	keyForDelete := datastore.NewKey(ctx, KAKEIBO_ENTRY, "", int64(id), getMonthKey(ctx, KakeiboId, year, month))
+	// 削除対象のエンティティを格納するkakeiboEntry
+	var entryToDelete Kakeibo
+	// 更新対象のエンティティの取得
+	if err = datastore.Get(ctx, keyForDelete, &entryToDelete); err != nil {
+		return err
+	}
+	// 論理削除
+	entryToDelete.IsDeleted = TRUE
+	entryToDelete.IsSynchronized = FALSE
 	err = datastore.RunInTransaction(ctx, func(c context.Context) error {
-		e := datastore.Delete(c, keyForDelete)
+		_, e := datastore.Put(ctx, keyForDelete, &entryToDelete)
 		return e
 	}, nil)
 	if err != nil {
@@ -300,7 +313,7 @@ func DeleteMonth(r *http.Request, year, month int) error {
 		for m := 0; m < 12; m++ {
 			// 各月のキーを検索するクエリの作成
 			queries[m] = datastore.NewQuery(KAKEIBO_ENTRY).
-				Ancestor(getMonthKey(ctx, familyKakeibo, year, m+1)).KeysOnly()
+				Ancestor(getMonthKey(ctx, KakeiboId, year, m+1)).KeysOnly()
 		}
 		// 各月のキーを検索
 		keys := make([][]*datastore.Key, 12)
@@ -328,7 +341,7 @@ func DeleteMonth(r *http.Request, year, month int) error {
 		// 各月削除の場合
 		// 削除対象のキーを検索するクエリの作成
 		query := datastore.NewQuery(KAKEIBO_ENTRY).
-			Ancestor(getMonthKey(ctx, familyKakeibo, year, month)).KeysOnly()
+			Ancestor(getMonthKey(ctx, KakeiboId, year, month)).KeysOnly()
 		// 削除する月のキーを検索
 		err = datastore.RunInTransaction(ctx, func(c context.Context) error {
 			var e error
@@ -354,6 +367,27 @@ func DeleteMonth(r *http.Request, year, month int) error {
 	return nil
 }
 
+// DBからデータ削除を行う関数
+func Delete(r *http.Request, id, year, month int) error {
+	var err error
+	//===
+	//=== エントリの削除
+	//===
+	// Contextの作成
+	ctx := appengine.NewContext(r)
+	// 削除対象のエンティティのキーの取得
+	keyForDelete := datastore.NewKey(ctx, KAKEIBO_ENTRY, "", int64(id), getMonthKey(ctx, KakeiboId, year, month))
+	err = datastore.RunInTransaction(ctx, func(c context.Context) error {
+		e := datastore.Delete(c, keyForDelete)
+		return e
+	}, nil)
+	if err != nil {
+		return err
+	}
+	// エラーがなければnilを返す
+	return nil
+}
+
 // 家計簿の名前に対応するキーを返す関数
 func getKakeiboKey(c context.Context, kakeiboName string) *datastore.Key {
 	return datastore.NewKey(c, KAKEIBO_ID, kakeiboName, 0, nil)
@@ -368,4 +402,3 @@ func getYearKey(c context.Context, kakeiboName string, year int) *datastore.Key 
 func getMonthKey(c context.Context, kakeiboName string, year, month int) *datastore.Key {
 	return datastore.NewKey(c, KAKEIBO_MONTH, "", int64(month), getYearKey(c, kakeiboName, year))
 }
-
