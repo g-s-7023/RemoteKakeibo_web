@@ -82,17 +82,17 @@ const (
 
 // DBに登録・参照するための構造体
 type Kakeibo struct {
-	Id              int
-	Day             int
-	Month           int
-	Year            int
-	DayOfWeek       int
-	Category        int
-	Type            int
-	Price           int
-	Detail          string
-	TermsOfPayment  int
-	IsDeleted       int
+	Id              int    `json:"id"`
+	Day             int    `json:"day"`
+	Month           int    `json:"month"`
+	Year            int    `json:"year"`
+	DayOfWeek       int    `json:"dayOfWeek"`
+	Category        int    `json:"category"`
+	Type            int    `json:"type"`
+	Price           int    `json:"price"`
+	Detail          string `json:"detail"`
+	TermsOfPayment  int    `json:"termsOfPayment"`
+	IsDeleted       int    `json:"isDeleted"`
 	IsSynchronized  int
 	LastUpdatedDate string
 }
