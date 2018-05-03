@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"errors"
 )
 
 // 入力されたデータをDBに登録する関数
@@ -386,6 +387,95 @@ func Delete(r *http.Request, id, year, month int) error {
 	}
 	// エラーがなければnilを返す
 	return nil
+}
+
+// クライアントから送られてきたIDがDB内にあるか探す関数
+// 戻り値：エラー、(ヒットした場合)エントリのkey、年、月、isSynchronizedの値
+func SearchIdFromClient(ctx context.Context, id int) (*datastore.Key, int, int, int, error) {
+	//===
+	//=== エントリの取得
+	//===
+	// queryの作成
+	// 指定した家計簿中の年・月で指定したエントリを全て表示
+	query := datastore.NewQuery(KAKEIBO_ENTRY).Ancestor(getKakeiboKey(ctx, KAKEIBO_ID)).Filter("Id =", id)
+	// queryの結果格納用のsliceの作成
+	var result []Kakeibo
+	// queryの実行結果のキー格納用のsliceの作成
+	var keys []*datastore.Key
+	// トランザクションでクエリを実行
+	err := datastore.RunInTransaction(ctx, func(c context.Context) error {
+		var e error
+		keys, e = query.GetAll(c, &result)
+		return e
+	}, nil)
+	if err != nil {
+		// エラーなら無効な値を返す
+		return nil, -1, -1, TRUE, err
+	}
+	switch len(keys) {
+	case 0:
+		// ヒット無し -> 新規でinsert
+		return nil, -1, -1, FALSE, nil
+	case 1:
+		// ヒットあり -> update(isSynchronizedがTRUEの場合)
+		return keys[0], result[0].Year, result[0].Month, result[0].IsSynchronized, nil
+	default:
+		// 同じIdのkeyが2以上はあってはいけないので、エラー
+		return nil, -1, -1, TRUE, errors.New("duplicated ID")
+	}
+}
+
+func Synchronize(ctx context.Context, paramsToSync []ParamToSync, keysForDelete []*datastore.Key) error {
+	//===
+	//=== paramを分解して、登録するエントリとkeyの取得
+	//===
+	entries := make([]Kakeibo, len(paramsToSync))
+	keysForUpdate := make([]*datastore.Key, len(paramsToSync))
+	for i, p := range paramsToSync {
+		entries[i] = p.Entry
+		keysForUpdate[i] = p.Key
+	}
+	//===
+	//=== DB登録
+	//===
+	return datastore.RunInTransaction(ctx, func(c context.Context) error {
+		// 削除と更新をトランザクションで実行
+		if len(keysForDelete) > 0 {
+			if e := datastore.DeleteMulti(ctx, keysForDelete); e != nil {
+				return e
+			}
+		}
+		if len(keysForUpdate) > 0 {
+			if _, e := datastore.PutMulti(ctx, keysForUpdate, &entries); e != nil {
+				return e
+			}
+		}
+		return nil
+	}, nil)
+}
+
+// クライアントから送られてきたIDがDB内にあるか探す関数
+// 戻り値：(ヒットした場合)家計簿エントリ、エラー
+func getKakeiboToSend(ctx context.Context) ([]Kakeibo, error){
+	//===
+	//=== エントリの取得
+	//===
+	// queryの作成
+	// まだ同期していない(=IsSynchronizedがFALSEの)エントリを取得
+	query := datastore.NewQuery(KAKEIBO_ENTRY).Ancestor(getKakeiboKey(ctx, KAKEIBO_ID)).Filter("IsSynchronized =", FALSE)
+	// queryの結果格納用のsliceの作成
+	var result []Kakeibo
+	// トランザクションでクエリを実行
+	err := datastore.RunInTransaction(ctx, func(c context.Context) error {
+		var e error
+		_, e = query.GetAll(c, &result)
+		return e
+	}, nil)
+	if err != nil {
+		// エラーなら無効な値を返す
+		return nil, err
+	}
+	return result, nil
 }
 
 // 家計簿の名前に対応するキーを返す関数

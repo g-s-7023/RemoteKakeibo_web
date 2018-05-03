@@ -1,17 +1,17 @@
-package develop
+package RemoteKakeibo_web
 
 import (
 	"net/http"
-	"housekeeping_web/lib"
+	"RemoteKakeibo_web/lib"
 )
 
 // (開発サーバ)
 // app.yamlとこのファイルをdevelopフォルダにおく
-// DIR_HTMLの値を"../html/"、cssのstatic_dirを"../css"
+// global.goのDIR_HTMLの値を"../html/"、app.yamlのcssのstatic_dirを"../css"にする
 
 // (デプロイ)
 // app.yamlとこのファイルをトップレベルに置く
-// デプロイ DIR_HTML1の値を"html/"、cssのstatic_dirを"css"
+// global.goのDIR_HTMLの値を"html/"、app.yamlのcssのstatic_dirを"css"にする
 
 func init() {
 	http.HandleFunc("/", lib.Entry)
@@ -26,6 +26,7 @@ func init() {
 	http.HandleFunc("/user/doupdate", lib.DoUpdate)
 	http.HandleFunc("/user/dodelete", lib.DoDelete)
 	http.HandleFunc("/user/dosync", lib.DoSynchronize)
+	http.HandleFunc("/ping", lib.Ping)
 	http.HandleFunc("/dologout", lib.DoLogout)
 	http.Handle("/css", http.FileServer(http.Dir(".")))
 }

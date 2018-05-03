@@ -2,6 +2,7 @@ package lib
 
 import (
 	"time"
+	"google.golang.org/appengine/datastore"
 )
 
 const (
@@ -11,7 +12,7 @@ const (
 	INPUTLINES = 15
 	//===
 	//=== htmlファイルのディレクトリ
-	DIR_HTML = "../html/"
+	DIR_HTML = "html/"
 	//===
 	//===
 	//=== 使いはじめる年
@@ -192,6 +193,22 @@ type ParamToShowSummary struct {
 	OthersOfMonth []int
 	// 表示対象の費目に対応した文字列と各月の金額
 	Results map[int]*ResultOfMonth
+}
+
+// 同期時に更新用のエントリとキーを格納する構造体
+type ParamToSyncUpdate struct {
+	// 更新するエントリのキー
+	Key *datastore.Key
+	// 更新するエントリ
+	Entry Kakeibo
+}
+
+// 同期時に同期するエントリとキーを格納する構造体
+type ParamToSync struct {
+	// 更新するエントリのキー
+	Key *datastore.Key
+	// 更新するエントリ
+	Entry Kakeibo
 }
 
 var (

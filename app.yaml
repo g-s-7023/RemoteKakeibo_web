@@ -1,9 +1,14 @@
 runtime: go
 api_version: go1
 
+automatic_scaling:
+  min_idle_instances: automatic
+  max_idle_instances: 1
+  min_pending_latency: 2000ms
+
 handlers:
 - url: /css
-  static_dir: ../css
+  static_dir: css
 
 - url: /user/.*
   script: _go_app
@@ -17,4 +22,7 @@ handlers:
   script: _go_app
 
 - url: /dologout
+  script: _go_app
+
+- url: /ping
   script: _go_app
